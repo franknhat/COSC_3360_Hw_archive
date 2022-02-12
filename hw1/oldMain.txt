@@ -1,0 +1,94 @@
+#include <iostream> 
+#include <string>
+#include <map>
+#include <cmath>
+#include <thread>
+#include <vector>
+
+std::string decimal_to_binary(int x){
+    std::string bin;
+    while(x){
+        x%2==0?bin='0'+bin:bin='1'+bin;
+        x/=2;
+    }
+    return bin;
+}
+
+void n_threads(std::map<std::string,std::pair<char,int>>& decoding_table,std::vector<char>& v, int& max){
+    std::string in;
+    std::getline(std::cin, in);
+    if(stoi(in.substr(2))>max)
+        max=stoi(in.substr(2));
+    v.push_back(in[0]);
+    decoding_table.insert(std::pair<std::string,std::pair<char,int>>(decimal_to_binary(stoi(in.substr(2))),std::pair<char,int>(in[0],0)));
+}
+
+void n_threadsCount(std::string m,std::string letter,int max ,int& c){
+    for(int i=0;i<m.length();i+=max)
+        if(m.substr(i,max)==letter)
+            c++;
+}
+
+void m_threads(std::map<std::string,std::pair<char,int>> decoding_table, std::string m, int idx,int max,std::string& x){
+    std::string sub=m.substr(idx*max,max);
+    x+= decoding_table[sub].first;
+}
+
+std::string takeInput(std::map<char,std::pair<std::string,int>>& table, std::vector<char>& order){
+    std::map<std::string,std::pair<char,int>> decoding_table; //this makes it easier to work with tbh
+    int val, max=-1;
+    char letter;
+    std::string input, message="", numInput;
+    std::vector<std::thread> workers;
+
+    std::getline(std::cin, numInput); //taking all the inputs and chucking it into decoding table
+    for(int i=0;i<stoi(numInput);i++){
+        workers.push_back(std::thread(n_threads, std::ref(decoding_table),std::ref(order),std::ref(max)));
+        workers[i].join();
+    }
+    std::getline(std::cin,input);
+    max=ceil(log2(max));
+
+    std::map<std::string,std::pair<char,int>>::iterator it;
+    for(it=decoding_table.begin();it!=decoding_table.end();++it)//worst case O(n^2) if only one is at that ceiling
+        if(it->first.length()!=max){
+            std::string temp=it->first;
+            while(temp.length()!=max) //adds the 0s back into
+                temp='0'+temp;
+            decoding_table.insert(std::pair<std::string,std::pair<char,int>>(temp,it->second));
+            decoding_table.erase(it->first);
+            it=decoding_table.begin(); //resets it after adding new and removing old
+        }
+    while (!workers.empty())
+        workers.pop_back();
+    for(it=decoding_table.begin();it!=decoding_table.end();++it)
+        workers.push_back(std::thread(n_threadsCount,input,it->first,max,std::ref(it->second.second)));
+    for (std::thread &t: workers)
+      if (t.joinable()) 
+        t.join();
+    while (!workers.empty())
+        workers.pop_back();
+    for(int i=0;i<input.length()/max;i++){
+        workers.push_back(std::thread(m_threads,decoding_table,input,i,max,std::ref(message)));
+        workers[i].join();
+    }
+    for(it=decoding_table.begin();it!=decoding_table.end();++it)
+        table.insert(std::pair<char,std::pair<std::string,int>>(it->second.first,std::pair<std::string, int>(it->first,it->second.second)));
+    return message;
+}
+
+void printInfo(std::string m, std::map<char,std::pair<std::string,int>> table, std::vector<char> order){
+    std::cout<<"Alphabet:"<<std::endl;
+    for(int i=0;i<order.size();i++)
+        std::cout<<"Character: "<<order[i]<<", Code: "<<table[order[i]].first<<", Frequency: "<<table[order[i]].second<<std::endl;
+    std::cout<<std::endl;
+    std::cout<<"Decompressed message: "<<m<<std::endl;
+}
+
+int main(){
+    std::map<char,std::pair<std::string,int>> table;
+    std::vector<char> order;
+    std::string message=takeInput(table, order);
+    printInfo(message, table,order);
+    return 0;
+}

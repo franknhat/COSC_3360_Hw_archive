@@ -1,0 +1,143 @@
+#include <iostream> 
+#include <string>
+#include <map>
+#include <cmath>
+#include <vector>
+#include <pthread.h>
+#include <unistd.h>
+
+struct arg
+{
+    std::map<std::string,std::pair<char,int>> d_table;
+    std::vector<char> v;
+    int max=-1;
+    int count;
+    std::string message;
+    std::string letter;
+};
+
+
+std::string decimal_to_binary(int x){
+    std::string bin;
+    while(x){
+        x%2==0?bin='0'+bin:bin='1'+bin;
+        x/=2;
+    }
+    return bin;
+}
+
+void *n_threads(void* args/*std::map<std::string,std::pair<char,int>>& decoding_table,std::vector<char>& v, int& max*/){
+    arg * arg_var = (arg *)args;
+    //pthread_mutex_lock(&mtx);
+    std::string in;
+    std::getline(std::cin, in);
+    if(stoi(in.substr(2))>arg_var->max)
+        arg_var->max=stoi(in.substr(2));
+    arg_var->v.push_back(in[0]);
+    arg_var->d_table.insert(std::pair<std::string,std::pair<char,int>>(decimal_to_binary(stoi(in.substr(2))),std::pair<char,int>(in[0],0)));    return NULL;
+}
+
+void* n_threadsCount(void* args/*std::string m,std::string letter,int max ,int& c*/){
+    arg * arg_var = (arg *)args;
+    for(int i=0;i<arg_var->message.length();i+=arg_var->max)
+        if(arg_var->message.substr(i,arg_var->max)==arg_var->letter){
+            arg_var->d_table[arg_var->letter].second++;//=arg_var->d_table[arg_var->letter].second+1;
+            //std::cout<<"Freq should incr"<<std::endl;
+        }
+    return NULL;
+}
+
+void *m_threads(void* args/*std::map<std::string,std::pair<char,int>> decoding_table, std::string m, int idx,int max,std::string& x*/){
+    arg * arg_var = (arg *)args;
+    std::string sub=arg_var->message.substr(arg_var->count*arg_var->max,arg_var->max);
+    arg_var->letter[arg_var->count]= arg_var->d_table[sub].first;
+    return NULL;
+}
+
+std::string takeInput(std::map<char,std::pair<std::string,int>>& table, std::vector<char>& order){
+    int val, max=-1;
+    char letter;
+    std::string input, message="", numInput;
+    std::vector<pthread_t> threads;
+    //std::vector<std::thread> workers;
+    arg args;
+
+    std::getline(std::cin, numInput); //taking all the inputs and chucking it into decoding table
+    for(int i=0;i<stoi(numInput);i++){
+        /*
+        workers.push_back(std::thread(n_threads, std::ref(decoding_table),std::ref(order),std::ref(max)));
+        workers[i].join();*/
+        pthread_t temp;
+        threads.push_back(temp);
+        pthread_create(&threads[threads.size()-1], NULL, n_threads,(void*)&args);
+        //pthread_setschedprio(threads[threads.size()-1],i*10);
+        //sleep(0.5);
+    }
+    for(int i=0;i<stoi(numInput);i++){
+        pthread_join(threads[i],NULL);
+    }
+    while(threads.size())
+        threads.pop_back();
+    
+    std::getline(std::cin,input);
+    args.message=input;
+    args.max=ceil(log2(args.max));
+    std::map<std::string,std::pair<char,int>>::iterator it;
+    for(it=args.d_table.begin();it!=args.d_table.end();++it)//worst case O(n^2) if only one is at that ceiling
+        if(it->first.length()!=args.max){
+            std::string temp=it->first;
+            while(temp.length()!=args.max) //adds the 0s back into
+                temp='0'+temp;
+            args.d_table.insert(std::pair<std::string,std::pair<char,int>>(temp,it->second));
+            args.d_table.erase(it->first);
+            it=args.d_table.begin(); //resets it after adding new and removing old
+            //std::cout<<"Loop here?"<<std::endl;
+        }
+    args.count=0;
+    int k=0;
+    for(it=args.d_table.begin();it!=args.d_table.end();++it){
+        args.letter=it->first;
+        pthread_t temp;
+        threads.push_back(temp);
+        pthread_create(&threads[threads.size()-1], NULL, n_threadsCount, (void*)&args);  
+        
+        //pthread_setschedprio(threads[threads.size()-1],k+=10);
+        //sleep(0.5);
+    }
+    //sleep(1);
+    for (int i=0;i<threads.size();i++)
+        pthread_join(threads[i],NULL);
+    while (!threads.empty())
+        threads.pop_back();
+    args.letter="";
+    for(int i=0;i<input.length()/args.max;i++)
+        args.letter+='0';
+    for(args.count=0;args.count<input.length()/args.max;args.count++){
+        pthread_t temp;
+        threads.push_back(temp);
+        pthread_create(&threads[threads.size()-1], NULL, m_threads, (void*)&args);
+    }
+    //sleep(1);
+    for (int i=0;i<threads.size();i++)
+        pthread_join(threads[i],NULL);
+    for(it=args.d_table.begin();it!=args.d_table.end();++it)
+        table.insert(std::pair<char,std::pair<std::string,int>>(it->second.first,std::pair<std::string, int>(it->first,it->second.second)));
+    order=args.v;
+    return args.letter;
+}
+
+void printInfo(std::string m, std::map<char,std::pair<std::string,int>> table, std::vector<char> order){
+    std::cout<<"Alphabet:"<<std::endl;
+    for(int i=0;i<order.size();i++)
+        std::cout<<"Character: "<<order[i]<<", Code: "<<table[order[i]].first<<", Frequency: "<<table[order[i]].second<<std::endl;
+    std::cout<<std::endl;
+    std::cout<<"Decompressed message: "<<m<<std::endl;
+}
+
+int main(){
+    std::map<char,std::pair<std::string,int>> table;
+    std::vector<char> order;
+    std::string message=takeInput(table, order);
+    printInfo(message, table,order);
+    return 0;
+}
