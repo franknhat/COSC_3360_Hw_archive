@@ -43,7 +43,7 @@ void setMap(std::map<std::string, char> &m, int len)
         std::getline(std::cin, v[i]);
         for (int j = 0; j < v[i].length(); j++)
         {
-            if (isdigit(v[i][j]) == true)
+            if (isdigit(v[i][j]) == true && j!=0)
             {
                 if (stoi(v[i].substr(j)) > largest)
                     largest = stoi(v[i].substr(j));
@@ -112,8 +112,8 @@ int main(int argc, char *argv[])
     n = write(newsockfd, buffer, 255);
     if (n < 0)
         error("ERROR writing to socket");
-    close(newsockfd);
-    
+    //close(newsockfd);
+
     signal(SIGCHLD, fireman);
     while (true)
     {

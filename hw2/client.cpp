@@ -138,7 +138,6 @@ int main(int argc, char *argv[])
     // take in string
     std::cin >> encocedmsg;
     numthreads = encocedmsg.length() / bitlength;
-
     pthread_t *threads = new pthread_t[numthreads];
 
     threadParams *var = new threadParams[numthreads];
