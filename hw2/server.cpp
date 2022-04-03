@@ -10,21 +10,18 @@
 #include <cmath>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 
-#define BUFFER_LENGTH 256
+//a lot of this code much like in client.cpp was dirived from rincons code from blackboard
 
-void fireman(int)
-{
+void fireman(int){
     while (waitpid(-1, NULL, WNOHANG) > 0)
         continue;
 }
 
-std::string decimal_to_binary(int x)
-{
+
+//as the name implies it takes a decimal int and returns a binary string
+std::string decimal_to_binary(int x){
     std::string bin;
     while (x)
     {
@@ -34,60 +31,51 @@ std::string decimal_to_binary(int x)
     return bin; // return the binary rep of the integer.
 }
 
-void setMap(std::map<std::string, char> &m, int len)
-{ // takes input and
+
+//This creates the map by taking in the input and filling it to a map
+void setMap(std::map<std::string, char> &m, int len){
     int largest = 0;
-    std::string *v = new std::string[len];
-    for (int i = 0; i < len; i++)
-    {
+    std::string *v = new std::string[len];//have to insert to an external array first due to bit length
+    for (int i = 0; i < len; i++){
         std::getline(std::cin, v[i]);
-        for (int j = 0; j < v[i].length(); j++)
-        {
-            if (isdigit(v[i][j]) == true && j!=0)
-            {
-                if (stoi(v[i].substr(j)) > largest)
-                    largest = stoi(v[i].substr(j));
-                std::string t = decimal_to_binary(stoi(v[i].substr(j)));
-                v[i] = v[i].substr(0, j - 1); // remove white space
-                v[i] += t;
-                break;
-            }
-        }
+        std::string temp=decimal_to_binary(stoi(v[i].substr(2)));//for get line its char white space then int so idx 2 to end is the int while index 0 is the char and index 1 is a white space
+        if(stoi(v[i].substr(2))>largest)
+            largest=stoi(v[i].substr(2));
+        v[i]=v[i][0]+temp;
     }
-    for (int i = 0; i < len; i++)
-    {
+
+    //taks the v arr and insert it into the map after formatting it
+    for (int i = 0; i < len; i++){
         std::string t;
         t = v[i].substr(1);
-        while (t.length() < ceil(log2(largest + 1)))
+        while (t.length() < ceil(log2(largest + 1)))//sets all to the same bitlength
             t = '0' + t;
         m.insert(std::pair<std::string, char>(t, v[i][0]));
     }
     delete[] v;
 }
 
-void error(char *msg)
-{
+void error(char *msg){
     perror(msg);
     exit(1);
 }
 
-int main(int argc, char *argv[])
-{
-
+int main(int argc, char *argv[]){
+    //initializing vars needed to take in input to map
     std::map<std::string, char> m;
-    std::string len;
-    std::getline(std::cin, len);
+    std::string len;//number of chars to be inputed with their decimal values, using string so I dont use cin and just getline
+    std::getline(std::cin, len);//didnt want to deal with cin.ignore later
     setMap(m, stoi(len));
     int bitlength = m.begin()->first.length();
     len = std::to_string(bitlength);
 
+    //initial the vars needed to connect the server and client
     int sockfd, newsockfd, portno, clilen;
 
-    char buffer[BUFFER_LENGTH];
+    char buffer[256];
     struct sockaddr_in serv_addr, cli_addr;
     int n;
-    if (argc < 2)
-    {
+    if (argc < 2){
         fprintf(stderr, "ERROR, no port provided\n");
         exit(1);
     }
@@ -99,45 +87,38 @@ int main(int argc, char *argv[])
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
-    if (bind(sockfd, (struct sockaddr *)&serv_addr,
-             sizeof(serv_addr)) < 0)
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
         error("ERROR on binding");
     listen(sockfd, 5);
     clilen = sizeof(cli_addr);
+
+    //created a new socket to allow me to send my bitlength over
     newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, (socklen_t *)&clilen);
     if (newsockfd < 0)
         error("ERROR on accept");
-    bzero(buffer, BUFFER_LENGTH);
+    bzero(buffer, 256);
     len.copy(buffer, sizeof(len.length()));
     n = write(newsockfd, buffer, 255);
     if (n < 0)
         error("ERROR writing to socket");
-    //close(newsockfd);
 
+    //fireman code
     signal(SIGCHLD, fireman);
-    while (true)
-    {
+    while (true){
+        //create a newsockfd to accept
         newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, (socklen_t *)&clilen);
-        if (fork() == 0)
-        {
-            //close(sockfd);
+        if (fork() == 0){
             if (newsockfd < 0)
                 error("new socket wont open");
-
-            bzero(buffer, BUFFER_LENGTH);
+            //set buffer to 0 to read in the binary string from client
+            bzero(buffer, 256);
             n = read(newsockfd, buffer, 255);
             if (n < 0)
                 error("ERROR reading from socket");
-            std::string temp;
-            for (int i = 0; i < 255; i++)
-            {
-                if (buffer[i] == '\0')
-                    break;
-                temp += buffer[i];
-            }
-            bzero(buffer, BUFFER_LENGTH);
-            buffer[0] = m[temp];
-            //std::cout << "the value is" << temp << '\n';
+            std::string temp=buffer;
+            //set buffer to 0 to send over the decoded char to client
+            bzero(buffer, 256);
+            buffer[0] = m[temp];//why maps were used for the ease of use
             n = write(newsockfd, buffer, 255);
             if (n < 0)
                 error("ERROR writing to socket");
@@ -145,7 +126,6 @@ int main(int argc, char *argv[])
             _exit(0);
         }
     }
-
     close(sockfd);
     return 0;
 }

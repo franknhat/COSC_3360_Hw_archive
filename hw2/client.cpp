@@ -1,19 +1,3 @@
-/*
-This program receives the number of bits of the fixed-length codes from the server program (using sockets). Then, your solution creates m child threads (where m is the number of characters in the decompressed message). Each child thread will use the parallel solution from assignment 1 to store the decompressed message into a memory location accessible by the main thread.
-
-Each child thread determines a character of the decompressed message following the steps presented below:
-
-Create a socket to communicate with the server program.
-Send the binary code of the symbol to decompress to the server program using sockets.
-Wait for the decompressed character from the server program.
-Write the received information into a memory location accessible by the main thread.
-Finish its execution.
-
-tldr: cin/getline binary message, receive bit leng from server,
-to do: send server spliced messege substr, receive decoded char, cout message
-*/
-
-// most of the code here has been taken from Rincon and his lecture/blackboard
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,24 +9,18 @@ to do: send server spliced messege substr, receive decoded char, cout message
 #include <string>
 #include <iostream>
 
-void error(char *msg)
-{
-    perror(msg);
-    exit(0);
-}
+//similar to my server.cpp a lot of this code is dirived from Rincons code from blackboard
 
-struct threadParams
-{
+struct threadParams{
     std::string subMsg;
-    int bitlength; //?
+    int bitlength;
     char symbol;
     struct sockaddr_in server_addr;
     struct hostent *serv;
     int portnumber;
 };
 
-void *sendServerThreads(void *params)
-{
+void *sendServerThreads(void *params){
     threadParams *args = (threadParams *)params;
 
     int sockfd, portno, n;
@@ -57,92 +35,100 @@ void *sendServerThreads(void *params)
 
     // make a new socket per thread
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
-    {
-        error("ERROR opening socket");
+    if (sockfd < 0){
+        std::cout<<"ERROR opening socket\n";
+        exit(0);
     }
+
+    //connecting to server
     bzero((char *)&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     bcopy((char *)server->h_addr,
           (char *)&serv_addr.sin_addr.s_addr,
           server->h_length);
     serv_addr.sin_port = htons(portno);
-    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        error("ERROR connecting");
+    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
+        std::cout<<"Error connecting to server\n";
+        exit(0);
+    }
 
     bzero(buffer, args->bitlength + 2);
     args->subMsg.copy(buffer, sizeof(args->subMsg.length()));
     n = write(sockfd, buffer, args->bitlength + 1);
-    if (n < 0)
-    {
-        error("Error writing the socket");
+    if (n < 0){
+        std::cout<<"Error writing the socket\n";
+        exit(0);
     }
     bzero(buffer, args->bitlength + 2);
     n = read(sockfd, buffer, args->bitlength + 1);
-    if (n < 0)
-        error("ERROR reading from socket");
+    if (n < 0){
+        std::cout<<"ERROR reading from socket\n";
+    }
+
     args->symbol = buffer[0];
 
     close(sockfd);
     return NULL;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
     int sockfd, portno, n, bitlength, numthreads;
     std::string temp, encocedmsg, decodedmsg;
     struct sockaddr_in serv_addr;
     struct hostent *server;
 
     char buffer[256];
-    if (argc < 3)
-    {
-        fprintf(stderr, "usage %s hostname port\n", argv[0]);
-        exit(0);
+    if (argc < 3){
+        std::cout<<"too little arguments for client.cpp\n";
+        return -1;
     }
+    
+    //create socket
     portno = atoi(argv[2]);
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
-        error("ERROR opening socket");
+    if (sockfd < 0){
+        std::cout<<"ERROR opening socket\n";
+        return -1;
+    }
+
+    //get server
     server = gethostbyname(argv[1]);
-    if (server == NULL)
-    {
+    if (server == NULL){
         fprintf(stderr, "ERROR, no such host\n");
         exit(0);
     }
+    //connect to server
     bzero((char *)&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     bcopy((char *)server->h_addr,
           (char *)&serv_addr.sin_addr.s_addr,
           server->h_length);
     serv_addr.sin_port = htons(portno);
-    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        error("ERROR connecting");
-    bzero(buffer, 256);
-    // receives from server the bitlength
-    n = read(sockfd, buffer, 255);
-    if (n < 0)
-        error("ERROR reading from socket");
-    close(sockfd);
-    // read from buffer
-    temp = "";
-    for (int i = 0; i < 255; i++)
-    {
-        if (buffer[i] == '\0')
-            break;
-        temp += buffer[i];
+    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0){
+        std::cout<<"ERROR connecting to server\n";
+        return -1;
     }
-    bitlength = std::stoi(temp);
-    //std::cout << "yo the bitlenth is: " << bitlength << '\n';
 
-    // take in string
+    // receives from server the bitlength
+    bzero(buffer, 256);
+    n = read(sockfd, buffer, 255);
+    if (n < 0){
+        std::cout<<"ERROR reading from socket\n";
+    }
+    close(sockfd); //close not needed till pthreads
+    // read from buffer
+    temp = buffer; //converts char[] to string
+    bitlength = std::stoi(temp);//then to an int for bitlength
+
+    // take in string encoded message
     std::cin >> encocedmsg;
+
+    //creating threads
     numthreads = encocedmsg.length() / bitlength;
     pthread_t *threads = new pthread_t[numthreads];
-
+    //sending vars that are needed for all threads
     threadParams *var = new threadParams[numthreads];
-    for (int i = 0; i < numthreads; i++)
-    {
+    for (int i = 0; i < numthreads; i++){
         var[i].bitlength = bitlength;
         var[i].subMsg = encocedmsg.substr(i * bitlength, bitlength);
         var[i].portnumber = portno;
@@ -151,21 +137,17 @@ int main(int argc, char *argv[])
     }
     // std::cout << "number of threads is: " << numthreads << '\n';
     for (int i = 0; i < numthreads; i++)
-    {
         pthread_create(&threads[i], NULL, sendServerThreads, &var[i]);
-    }
+    
     for (int i = 0; i < numthreads; i++)
-    {
         pthread_join(threads[i], NULL);
-    }
+    
     delete[] threads;
 
     for (int i = 0; i < numthreads; i++)
-    {
         decodedmsg += var[i].symbol;
-        // std::cout << "the char for index" << i << " is " << var[i].symbol << '\n';
-    }
-    std::cout << "Decompressed message: " << decodedmsg << "\n";
     delete[] var;
+
+    std::cout << "Decompressed message: " << decodedmsg << "\n";
     return 0;
 }
