@@ -4,7 +4,6 @@
 #include <cmath>
 #include <map>
 #include <vector>
-static pthread_mutex_t sem;
 
 struct nArgs{
     std::map<std::string,char>* m;
