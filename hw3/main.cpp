@@ -12,7 +12,7 @@ struct nArgs{
     pthread_mutex_t* sem;
     pthread_cond_t* waitTurn;
     char c;//character finding binary of
-    int* parIdx;//int for synchronization
+    int parIdx=0;//int for synchronization
     int dec;//decimal value of char
     int bitLength;
     void setArgs(pthread_mutex_t* s,pthread_cond_t* wT, std::unordered_map<std::string, char>* mappu,std::string* message, char curChar,int decIn, int* cur){
@@ -20,7 +20,7 @@ struct nArgs{
         waitTurn=wT;
         msg=message;
         c=curChar;
-        parIdx=cur;
+        //parIdx=cur;
         dec=decIn;
         m=mappu;
     }
@@ -32,14 +32,14 @@ struct mArgs{
     pthread_cond_t* waitTurn;
     std::unordered_map<std::string,char>* m;
     std::string submsg;
-    int* parIdx;
+    int parIdx=0;
     std::string* str;
     void setInital(pthread_mutex_t* daSem,pthread_cond_t* turn,std::unordered_map<std::string,char>* mappu, std::string* input_str,int* idxPar){
         sem=daSem;
         waitTurn=turn;
         str=input_str;
         m=mappu;
-        parIdx=idxPar;
+        //parIdx=idxPar;
     }
     //no need for destructor since its pointers to addresses in main rather than memory allocation
 };
@@ -70,7 +70,7 @@ int main(){
 
     for(int i=0;i<numInput;i++){
         pthread_mutex_lock(&bsem); //sometimes deadlocks ;-;
-        while(i!=curIdx)//prob cuz initalize at 0 maybe
+        while(i!=nThreadArgs->parIdx)//prob cuz initalize at 0 maybe
             pthread_cond_wait(&waitTurn,&bsem);
         nThreadArgs->setArgs(&bsem,&waitTurn, &inMap,&inStr,inputArr[i].first,inputArr[i].second,&curIdx);
         pthread_create(&threads[i],NULL,nThreadsFunction, nThreadArgs);
@@ -94,7 +94,7 @@ int main(){
     std::cout<<"\nDecompressed message: ";
     for(int i=0;i<inStr.length()/bitlength;i++){
         pthread_mutex_lock(&bsem);
-        while(i>*mThreadsAgs.parIdx)
+        while(i>mThreadsAgs.parIdx)
             pthread_cond_wait(&waitTurn, &bsem);
         mThreadsAgs.submsg=inStr.substr(i*bitlength,bitlength);
         pthread_create(&threads[i],NULL,mThreadsFunction,&mThreadsAgs);
@@ -119,7 +119,7 @@ void* nThreadsFunction(void* argumen){//first thread call
     std::cout<<"Character: "<<argu->c<<", Code: "<<temp<<", Frequency: "<<freq<<"\n";
     
     pthread_mutex_lock(argu->sem);
-    (*argu->parIdx)++;//iterates a main int, this is the synchronization
+    (argu->parIdx)++;//iterates a main int, this is the synchronization
     pthread_cond_broadcast(argu->waitTurn);
     pthread_mutex_unlock(argu->sem);
     
@@ -133,7 +133,7 @@ void* mThreadsFunction(void* nArgs){
     (*args->str)+=(*args->m)[args->submsg];
 
     pthread_mutex_lock(args->sem);
-    (*args->parIdx)+=1;
+    (args->parIdx)+=1;
     pthread_cond_broadcast(args->waitTurn);
     pthread_mutex_unlock(args->sem);
     
