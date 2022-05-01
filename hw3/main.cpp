@@ -15,12 +15,11 @@ struct nArgs{
     int parIdx=0;//int for synchronization
     int dec;//decimal value of char
     int bitLength;
-    void setArgs(pthread_mutex_t* s,pthread_cond_t* wT, std::unordered_map<std::string, char>* mappu,std::string* message, char curChar,int decIn, int* cur){
+    void setArgs(pthread_mutex_t* s,pthread_cond_t* wT, std::unordered_map<std::string, char>* mappu,std::string* message, char curChar,int decIn){
         sem=s;
         waitTurn=wT;
         msg=message;
         c=curChar;
-        //parIdx=cur;
         dec=decIn;
         m=mappu;
     }
@@ -34,12 +33,11 @@ struct mArgs{
     std::string submsg;
     int parIdx=0;
     std::string* str;
-    void setInital(pthread_mutex_t* daSem,pthread_cond_t* turn,std::unordered_map<std::string,char>* mappu, std::string* input_str,int* idxPar){
+    void setInital(pthread_mutex_t* daSem,pthread_cond_t* turn,std::unordered_map<std::string,char>* mappu, std::string* input_str){
         sem=daSem;
         waitTurn=turn;
         str=input_str;
         m=mappu;
-        //parIdx=idxPar;
     }
     //no need for destructor since its pointers to addresses in main rather than memory allocation
 };
@@ -54,7 +52,7 @@ int main(){
     std::pair<char, int>* inputArr;
     std::string inStr, outputStr;
     pthread_t* threads;
-    int numInput, bitlength=0, curIdx=0;
+    int numInput, bitlength=0;
     std::unordered_map<std::string, char> inMap;
 
     getInput(inputArr,numInput ,inStr, bitlength);
@@ -72,7 +70,7 @@ int main(){
         pthread_mutex_lock(&bsem); //sometimes deadlocks ;-;
         while(i!=nThreadArgs->parIdx)//prob cuz initalize at 0 maybe
             pthread_cond_wait(&waitTurn,&bsem);
-        nThreadArgs->setArgs(&bsem,&waitTurn, &inMap,&inStr,inputArr[i].first,inputArr[i].second,&curIdx);
+        nThreadArgs->setArgs(&bsem,&waitTurn, &inMap,&inStr,inputArr[i].first,inputArr[i].second);
         pthread_create(&threads[i],NULL,nThreadsFunction, nThreadArgs);
     }
     for(int i=0;i<numInput;i++)
@@ -86,8 +84,7 @@ int main(){
 
     //creates and set the mthread args
     mArgs mThreadsAgs;
-    curIdx=0;
-    mThreadsAgs.setInital(&bsem, &waitTurn,&inMap,&outputStr ,&curIdx);
+    mThreadsAgs.setInital(&bsem, &waitTurn,&inMap,&outputStr);
     threads= new pthread_t[inStr.length()/bitlength];
 
     //runs the m threads section
