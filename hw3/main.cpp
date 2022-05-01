@@ -2,11 +2,11 @@
 #include <iostream>
 #include <string>
 #include <cmath>
-#include <map>
 #include <vector>
+#include <unordered_map>
 
 struct nArgs{
-    std::map<std::string,char>* m;
+    std::unordered_map<std::string,char>* m;
     std::string* msg;//coded message
     
     pthread_mutex_t* sem;
@@ -15,7 +15,7 @@ struct nArgs{
     int* parIdx;//int for synchronization
     int dec;//decimal value of char
     int bitLength;
-    void setArgs(pthread_mutex_t* s,pthread_cond_t* wT, std::map<std::string, char>* mappu,std::string* message, char curChar,int decIn, int* cur){
+    void setArgs(pthread_mutex_t* s,pthread_cond_t* wT, std::unordered_map<std::string, char>* mappu,std::string* message, char curChar,int decIn, int* cur){
         sem=s;
         waitTurn=wT;
         msg=message;
@@ -30,12 +30,14 @@ struct nArgs{
 struct mArgs{
     pthread_mutex_t* sem;
     pthread_cond_t* waitTurn;
-    std::map<std::string,char>* m;
+    std::unordered_map<std::string,char>* m;
     std::string submsg;
     int* parIdx;
-    void setInital(pthread_mutex_t* daSem,pthread_cond_t* turn,std::map<std::string,char>* mappu, int* idxPar){
+    std::string* str;
+    void setInital(pthread_mutex_t* daSem,pthread_cond_t* turn,std::unordered_map<std::string,char>* mappu, std::string* input_str,int* idxPar){
         sem=daSem;
         waitTurn=turn;
+        str=input_str;
         m=mappu;
         parIdx=idxPar;
     }
@@ -50,10 +52,10 @@ void* mThreadsFunction(void* nArgs);
 
 int main(){
     std::pair<char, int>* inputArr;
-    std::string inStr;
+    std::string inStr, outputStr;
     pthread_t* threads;
     int numInput, bitlength=0, curIdx=0;
-    std::map<std::string, char> inMap;
+    std::unordered_map<std::string, char> inMap;
 
     getInput(inputArr,numInput ,inStr, bitlength);
     
@@ -85,7 +87,7 @@ int main(){
     //creates and set the mthread args
     mArgs mThreadsAgs;
     curIdx=0;
-    mThreadsAgs.setInital(&bsem, &waitTurn,&inMap, &curIdx);
+    mThreadsAgs.setInital(&bsem, &waitTurn,&inMap,&outputStr ,&curIdx);
     threads= new pthread_t[inStr.length()/bitlength];
 
     //runs the m threads section
@@ -100,20 +102,20 @@ int main(){
 
     for(int i=0;i<inStr.length()/bitlength;i++)
         pthread_join(threads[i],NULL);
-    std::cout<<'\n';
+    std::cout<<outputStr<<'\n';
     delete [] threads;
     return 0;
 }
 
 void* nThreadsFunction(void* argumen){//first thread call
     nArgs* argu= (nArgs*) argumen;
+    pthread_mutex_unlock(argu->sem);
+
     //gets the substring of the current int and set length to bitlength
     std::string temp= decimal_to_binary(argu->dec, argu->bitLength);
     //insert into map from main to be used later
     (*argu->m).insert(std::pair<std::string,char>(temp ,argu->c));
     int freq=getFreq(*argu->msg, temp);
-    pthread_mutex_unlock(argu->sem);
-
     std::cout<<"Character: "<<argu->c<<", Code: "<<temp<<", Frequency: "<<freq<<"\n";
     
     pthread_mutex_lock(argu->sem);
@@ -126,10 +128,9 @@ void* nThreadsFunction(void* argumen){//first thread call
 
 void* mThreadsFunction(void* nArgs){
     mArgs* args= (mArgs*) nArgs;
-    char c=(*args->m)[args->submsg];
     pthread_mutex_unlock(args->sem);
 
-    std::cout<<c;
+    (*args->str)+=(*args->m)[args->submsg];
 
     pthread_mutex_lock(args->sem);
     (*args->parIdx)+=1;
