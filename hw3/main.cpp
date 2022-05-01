@@ -6,11 +6,10 @@
 #include <unordered_map>
 
 struct nArgs{
-    std::unordered_map<std::string,char>* m;
-    std::string* msg;//coded message
-    
     pthread_mutex_t* sem;
     pthread_cond_t* waitTurn;
+    std::unordered_map<std::string,char>* m; //used for inserting into the map
+    std::string* msg;//coded message
     char c;//character finding binary of
     int parIdx=0;//int for synchronization
     int dec;//decimal value of char
@@ -29,10 +28,10 @@ struct nArgs{
 struct mArgs{
     pthread_mutex_t* sem;
     pthread_cond_t* waitTurn;
-    std::unordered_map<std::string,char>* m;
-    std::string submsg;
+    std::unordered_map<std::string,char>* m; //used for reading from the map
+    std::string submsg; //substring to decode
     int parIdx=0;
-    std::string* str;
+    std::string* str; //string in main that holds the decompressed message
     void setInital(pthread_mutex_t* daSem,pthread_cond_t* turn,std::unordered_map<std::string,char>* mappu, std::string* input_str){
         sem=daSem;
         waitTurn=turn;
@@ -88,10 +87,9 @@ int main(){
     threads= new pthread_t[inStr.length()/bitlength];
 
     //runs the m threads section
-    std::cout<<"\nDecompressed message: ";
     for(int i=0;i<inStr.length()/bitlength;i++){
         pthread_mutex_lock(&bsem);
-        while(i>mThreadsAgs.parIdx)
+        while(i!=mThreadsAgs.parIdx)
             pthread_cond_wait(&waitTurn, &bsem);
         mThreadsAgs.submsg=inStr.substr(i*bitlength,bitlength);
         pthread_create(&threads[i],NULL,mThreadsFunction,&mThreadsAgs);
@@ -99,7 +97,7 @@ int main(){
 
     for(int i=0;i<inStr.length()/bitlength;i++)
         pthread_join(threads[i],NULL);
-    std::cout<<outputStr<<'\n';
+    std::cout<<"\nDecompressed message: "<<outputStr<<'\n';
     delete [] threads;
     return 0;
 }
